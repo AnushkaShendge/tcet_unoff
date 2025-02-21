@@ -112,22 +112,26 @@ def get_recent_communications():
 
 @app.route('/api/dashboard/context-suggestions', methods=['GET'])
 def get_context_suggestions():
-    """Get context-aware suggestions for dashboard"""
+    """Get context-aware suggestions for the dashboard"""
     try:
         # Get top 3 suggestions ordered by confidence score
-        suggestions = list(db.suggestions.find(
+        suggestions_cursor = db.suggestions.find(
             {'status': 'pending'},
             {
-                'id': {'$toString': '$_id'},
+                '_id': 1,  # Include _id (it will be converted later)
                 'text': '$suggestion_text',
                 'context': 1,
                 'confidence': '$confidence_score'
             }
-        ).sort('confidence_score', -1).limit(3))
-        
+        ).sort('confidence_score', -1).limit(3)
+
+        # Convert ObjectId to string using list comprehension
+        suggestions = [serialize_document(doc) for doc in suggestions_cursor]
+
         return jsonify(suggestions)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/dashboard/language-distribution', methods=['GET'])
 def get_language_distribution():
