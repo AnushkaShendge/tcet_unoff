@@ -66,6 +66,9 @@ all_actions = [
      'TWITTER_MEDIA_UPLOAD_MEDIA','TWITTER_MEDIA_UPLOAD_MEDIA','TWITTER_CREATION_OF_A_POST','TWITTER_FOLLOW_USER','TWITTER_UNFOLLOW_USER','TWITTER_GET_USER_S_FOLLOWED_LISTS','TWITTER_FOLLOWERS_BY_USER_ID'
 ]
 
+
+
+
 def clarify_ambiguous_task(task):
     """Identifies and clarifies ambiguous instructions in the task."""
     prompt = f"""
@@ -400,6 +403,248 @@ def handle_retry_with_feedback(task, error_message):
         }
 
 app = Flask(__name__)
+
+
+
+
+from flask import jsonify
+import google.generativeai as genai
+import json
+
+def detect_language(text, model):
+    """Detects the language of the input text using Gemini."""
+    prompt = f"""
+    Identify the language of this text. If it's an Indian language, specify which one.
+    Only return the language name, nothing else.
+    
+    Text: {text}
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+def translate_task_to_original(task_description, original_language, model):
+    """Translates a task description back to the original language."""
+    prompt = f"""
+    Translate this task description to {original_language}. 
+    Maintain all specific details like dates, times, names, and numbers.
+    Only return the translated text, nothing else.
+    
+    Text: {task_description}
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+def translate_to_english(text, model):
+    """Translates Indian language text to English while preserving key information."""
+    prompt = f"""
+    Translate the following text to English while preserving all key information,
+    especially any mentions of dates, times, files, or action items:
+
+    {text}
+
+    Provide only the English translation, nothing else.
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+import json
+
+def analyze_tasks(text, model):
+    json_structure = '''[
+    {
+        "agent": "agent_name",
+        "task_description": "Detailed description of the task",
+        "priority": "high/medium/low",
+        "dependencies": [],
+        "extracted_details": {
+            "dates": [],
+            "times": [],
+            "people": [],
+            "locations": []
+        }
+    }
+]'''
+
+    print("text is as follows:", text)
+    print("model is as follows:", model)
+    prompt = f"""
+Analyze the following text and extract specific actionable tasks that can be assigned to our specialized agents.Try to get atleast 2-3 agents as we need to show in ui
+
+### Input Text:
+{text}
+
+### Available Agents & Their Capabilities:
+1. **Calendar Agent**
+   - Schedule meetings and events
+   - Find available time slots
+   - Manage event attendees
+
+2. **Gmail Agent**
+   - Send emails
+   - Fetch and read emails
+   - Manage email threads
+
+3. **Google Docs Agent**
+   - Create new documents
+   - Share and retrieve document content
+
+4. **Google Drive Agent**
+   - Create folders
+   - Upload and share files
+   - Manage file permissions
+
+5. **Google Sheets Agent**
+   - Create and update spreadsheets
+   - Read spreadsheet content
+
+6. **Twitter Agent**
+   - Create posts (including images)
+   - Follow/unfollow users
+   - Retrieve user details
+
+7. **YouTube Agent**
+   - Search videos
+   - Fetch video details
+   - Access video captions
+
+### Task Extraction Instructions:
+- Identify tasks explicitly matching the agents' capabilities.
+- For each task, provide:
+  1. **Assigned Agent**
+  2. **Detailed Task Description**
+  3. **Relevant Details** (dates, times, people, locations, etc.)
+  4. **Task Dependencies** (if applicable)
+
+Return the response in valid JSON format with the following structure:
+{json_structure}"""
+
+    print("prompt is as follows:", prompt)
+    response = model.generate_content(prompt)
+    print("response from model is as follows:", response)
+    
+    try:
+        # Extract just the JSON content from the response
+        response_text = response.text
+        # Find the JSON part between triple backticks if present
+        if "```json" in response_text:
+            json_start = response_text.find("```json\n") + 8
+            json_end = response_text.rfind("```")
+            response_text = response_text[json_start:json_end].strip()
+        
+        # Parse the cleaned JSON
+        parsed_response = json.loads(response_text)
+        return parsed_response
+    except json.JSONDecodeError as e:
+        return {
+            "error": "Could not parse tasks",
+            "raw_response": response.text,
+            "parse_error": str(e)
+        }
+    except Exception as e:
+        return {
+            "error": "Unexpected error while processing tasks",
+            "raw_response": response.text,
+            "error_details": str(e)
+        }
+
+@app.route('/analyze_transcript', methods=['POST'])
+def analyze_transcript():
+    try:
+        data = request.json
+        transcript = data.get('transcript')
+        if not transcript:
+            return jsonify({"error": "Transcript is required"}), 400
+            
+        # Initialize Gemini
+        model = genai.GenerativeModel('gemini-pro')
+        print("hello")
+        # Detect original language
+        original_language = detect_language(transcript, model)
+        logger.info("Original language detected: %s", original_language)
+        print("original language detected is as follows:",original_language)
+        # Translate to English if not already in English
+        english_text = transcript if original_language.lower() == 'english' else translate_to_english(transcript, model)
+        logger.info("English translation: %s", english_text)
+        print("english translation is as follows:",english_text)
+        # Analyze the English text
+        tasks = analyze_tasks(english_text, model)
+        logger.info("Tasks identified: %s", tasks)
+        print("tasks identified are as follows:",tasks)
+        if isinstance(tasks, dict) and "error" in tasks:
+            return jsonify({
+                "error": "Task analysis failed",
+                "details": tasks["error"],
+                "original_transcript": transcript,
+                "language": original_language,
+                "english_translation": english_text
+            }), 500
+        
+        # Enrich tasks with translations and additional context
+        enriched_tasks = []
+        for task in tasks:
+            agent_type = task["agent"].lower().replace(" agent", "")
+            
+            # Get appropriate actions for this agent
+            if agent_type == "calendar":
+                actions = ['GOOGLECALENDAR_CREATE_EVENT', 'GOOGLECALENDAR_FIND_FREE_SLOTS']
+            elif agent_type == "gmail":
+                actions = ['GMAIL_SEND_EMAIL', 'GMAIL_FETCH_EMAILS']
+            elif agent_type == "docs":
+                actions = ['GOOGLEDOCS_CREATE_DOCUMENT', 'GOOGLEDOCS_GET_DOCUMENT_BY_ID']
+            elif agent_type == "drive":
+                actions = ['GOOGLEDRIVE_FIND_FILE', 'GOOGLEDRIVE_CREATE_FILE_FROM_TEXT', 
+                          'GOOGLEDRIVE_ADD_FILE_SHARING_PREFERENCE']
+            elif agent_type == "sheets":
+                actions = ['GOOGLESHEETS_CREATE_GOOGLE_SHEET1', 'GOOGLESHEETS_BATCH_UPDATE']
+            elif agent_type == "twitter":
+                actions = ['TWITTER_MEDIA_UPLOAD_MEDIA', 'TWITTER_CREATION_OF_A_POST']
+            elif agent_type == "youtube":
+                actions = ['YOUTUBE_SEARCH_YOU_TUBE', 'YOUTUBE_VIDEO_DETAILS']
+            else:
+                actions = []
+            
+            # Translate task description back to original language if not English
+            original_language_description = (
+                task["task_description"] 
+                if original_language.lower() == 'english'
+                else translate_task_to_original(task["task_description"], original_language, model)
+            )
+            
+            enriched_task = {
+                **task,
+                "task_description_original": original_language_description,
+                "task_description_english": task["task_description"],
+                "required_actions": actions,
+                "endpoint": f"/process_{agent_type}_task",
+                "validation_status": validate_task_for_agent(task["task_description"], agent_type)
+            }
+            enriched_tasks.append(enriched_task)
+        
+        return jsonify({
+            "transcript_info": {
+                "original_text": transcript,
+                "detected_language": original_language,
+                "english_translation": english_text
+            },
+            "tasks": {
+                "count": len(enriched_tasks),
+                "items": enriched_tasks
+            },
+            "metadata": {
+                "processing_timestamp": datetime.now().isoformat(),
+                "service_version": "1.0"
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error("Error processing transcript: %s", str(e))
+        return jsonify({
+            "error": "Failed to process transcript",
+            "details": str(e)
+        }), 500
 
 @app.route('/process_task', methods=['POST'])
 def process_task():
