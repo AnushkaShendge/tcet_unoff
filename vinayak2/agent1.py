@@ -648,6 +648,7 @@ def analyze_transcript():
 
 @app.route('/process_task', methods=['POST'])
 def process_task():
+    print("entry")
     data = request.json
     task = data.get('task')
     if not task:
