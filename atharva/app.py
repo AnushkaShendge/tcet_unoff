@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 import os
 import subprocess
 import logging
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +54,59 @@ def convert_m4a_to_mp3(input_path):
     except Exception as e:
         logger.error(f"Conversion error: {str(e)}")
         raise
+
+def get_language_code(language_name):
+    """Convert language name to code for transcription"""
+    # Add mappings as needed
+    language_mappings = {
+        'English': 'en',
+        'Hindi': 'hi',
+        'Marathi': 'mr',
+        'Spanish': 'es',
+        'French': 'fr',
+        'German': 'de',
+        'Chinese': 'zh',
+        'Japanese': 'ja',
+        'Korean': 'ko',
+        'Russian': 'ru',
+        'Italian': 'it',
+        'Portuguese': 'pt',
+        'Arabic': 'ar',
+        'Bengali': 'bn',
+        'Punjabi': 'pa',
+        'Gujarati': 'gu',
+        'Tamil': 'ta',
+        'Telugu': 'te',
+        'Malayalam': 'ml',
+        'Urdu': 'ur',
+        'Thai': 'th',
+        'Turkish': 'tr',
+        'Vietnamese': 'vi',
+        'Persian': 'fa',
+        'Greek': 'el',
+        'Hebrew': 'he',
+        'Dutch': 'nl',
+        'Swedish': 'sv',
+        'Polish': 'pl',
+        'Danish': 'da',
+        'Finnish': 'fi',
+        'Hungarian': 'hu',
+        'Czech': 'cs',
+        'Romanian': 'ro',
+        'Indonesian': 'id',
+        'Filipino': 'tl',
+        'Swahili': 'sw',
+        'Afrikaans': 'af',
+        'Ukrainian': 'uk',
+        'Serbian': 'sr',
+        'Bulgarian': 'bg',
+        'Slovak': 'sk',
+        'Lithuanian': 'lt',
+        'Latvian': 'lv',
+        'Estonian': 'et',
+    }
+
+    return language_mappings.get(language_name, 'en')  # Default to English if not found
 
 @app.route('/identify_language', methods=['POST'])
 def identify_language():
@@ -115,6 +169,78 @@ def identify_language():
             os.remove(filepath)
         if converted_file and os.path.exists(converted_file):
             os.remove(converted_file)
+            
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/transcribe', methods=['POST'])
+def transcribe():
+    # Check if a file was uploaded
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid file type'}), 400
+
+    converted_file = None
+    try:
+        # Save the uploaded file
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # Convert m4a to mp3 if needed
+        if filename.lower().endswith('.m4a'):
+            logger.info(f"Converting m4a file: {filepath}")
+            converted_file = convert_m4a_to_mp3(filepath)
+            processing_path = converted_file
+        else:
+            processing_path = filepath
+
+        # First detect the language
+        load_model()
+        signal = language_id.load_audio(processing_path)
+        prediction = language_id.classify_batch(signal)
+        detected_language = extract_language_name(prediction[3][0])
+        language_code = get_language_code(detected_language)
+
+        # Make request to the transcription service
+        transcription_url = "https://8817-34-127-75-234.ngrok-free.app/transcribe/"
+        
+        # Open and close the file properly using a context manager
+        with open(processing_path, 'rb') as audio_file:
+            files = {
+                'file': audio_file
+            }
+            data = {
+                'language': language_code
+            }
+            response = requests.post(transcription_url, files=files, data=data)
+        
+        # Now that the file handle is closed, we can safely remove the files
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        if converted_file and os.path.exists(converted_file):
+            os.remove(converted_file)
+        
+        return response.json()
+
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        # Clean up files in case of error
+        try:
+            if 'filepath' in locals() and os.path.exists(filepath):
+                os.remove(filepath)
+            if converted_file and os.path.exists(converted_file):
+                os.remove(converted_file)
+        except Exception as cleanup_error:
+            logger.error(f"Error during cleanup: {cleanup_error}")
             
         return jsonify({'error': str(e)}), 500
 
