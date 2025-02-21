@@ -1,6 +1,10 @@
 from flask import Flask, request, jsonify
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -38,7 +42,7 @@ def translate_text(source_lang, message, target_lang, service_id):
     
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': "sTDAW0anybv8208p1Orv-VtSWgGjBXl1qmJbNErLpFtPNdt4cMMzAl127bu7lhsO",
+        'Authorization': os.getenv("AUTHORIZATION_TOKEN"),
     }
     
     payload = {
@@ -84,7 +88,7 @@ def translate():
     source_language = data.get('source_language')
     target_language = data.get('target_language')
     text_to_translate = data.get('text')
-    service_id = data.get('service_id', "ai4bharat/indictrans-v2-all-gpu--t4")
+    service_id = data.get('service_id', os.getenv("DEFAULT_SERVICE_ID"))
 
     if not source_language or not target_language or not text_to_translate:
         return jsonify({"error": "Please provide source_language, target_language, and text"}), 400
