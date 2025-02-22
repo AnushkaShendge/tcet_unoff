@@ -1,16 +1,24 @@
 body {
-    font-family: Arial, sans-serif;
+    width: 400px;
     padding: 10px;
-  }
-  
-  #results {
-    max-width: 300px;
-  }
-  
-  #output {
+    font-family: Arial, sans-serif;
+}
+
+h2 {
+    margin-top: 0;
+    color: #333;
+}
+
+#output {
+    background-color: #f5f5f5;
+    padding: 10px;
+    border-radius: 4px;
     white-space: pre-wrap;
     word-wrap: break-word;
-    background: #f4f4f4;
-    padding: 10px;
-    border-radius: 5px;
-  }
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#output:empty {
+    display: none;
+}

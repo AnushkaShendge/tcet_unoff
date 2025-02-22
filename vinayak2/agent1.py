@@ -12,6 +12,7 @@ import io
 import google.generativeai as genai
 from flask import Flask, request, jsonify
 import os
+from flask_cors import CORS
 from dotenv import load_dotenv
 load_dotenv()
 GROQ_API_KEY=os.getenv("GROQ_API_KEY")
@@ -45,7 +46,8 @@ HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX
 HF_HEADERS = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
 
 # Initialize LLM
-llm = ChatGroq(model="llama-3.3-70b-versatile")
+llm = ChatGroq(model="llama-3.1-8b-instant")
+
 
 # Define available actions
 all_actions = [
@@ -404,7 +406,7 @@ def handle_retry_with_feedback(task, error_message):
 
 app = Flask(__name__)
 
-
+CORS(app)
 
 
 from flask import jsonify
@@ -651,6 +653,7 @@ def process_task():
     print("entry")
     data = request.json
     task = data.get('task')
+    print(task)
     if not task:
         return jsonify({"error": "Task is required"}), 400
 
