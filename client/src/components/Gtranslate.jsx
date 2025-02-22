@@ -30,14 +30,19 @@ const GTranslate = () => {
     <div
       id="google_translate_element"
       style={{
-        position: 'absolute',
-        top: '4rem',
-        right: '0.2rem',
-        opacity: 0.5,
+        position: 'fixed', // Changed from 'absolute' to 'fixed'
+        bottom: '2rem',    // Added bottom instead of top
+        right: '2rem',     // Increased right spacing
+        opacity: 0.8,      // Increased opacity slightly
         zIndex: 1000,
         backgroundColor: 'white',
-        borderRadius: '5px',
+        borderRadius: '8px',
         padding: '0.5rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)', // Added shadow
+        transition: 'opacity 0.2s',              // Added hover effect
+        '&:hover': {
+          opacity: 1
+        }
       }}
     ></div>
   );

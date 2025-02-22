@@ -1,0 +1,10 @@
+langchain
+langchain_groq
+composio-langchain
+dotenv
+requests
+logging
+datetime
+Pillow
+google-generativeai
+flask
