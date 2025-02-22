@@ -16,27 +16,27 @@ const Sidebar = () => {
           <div className="text-indigo-300 text-xs uppercase tracking-wider mb-3">Main</div>
           <ul className="space-y-2">
             <li className="bg-indigo-800 rounded-lg">
-              <a href="#" className="flex items-center p-3 text-white">
+              <a href="/dashboard" className="flex items-center p-3 text-white">
                 <BarChart2 className="h-5 w-5 mr-3" />
                 Dashboard
               </a>
             </li>
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/communication" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <MessageSquare className="h-5 w-5 mr-3" />
                 Communications
               </a>
             </li>
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/voice" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <Mic className="h-5 w-5 mr-3" />
                 Voice Input
               </a>
             </li>
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/companian" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <Globe className="h-5 w-5 mr-3" />
-                Languages
+                User Companian
               </a>
             </li>
           </ul>
@@ -46,19 +46,19 @@ const Sidebar = () => {
           <div className="text-indigo-300 text-xs uppercase tracking-wider mb-3">Management</div>
           <ul className="space-y-2">
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/learning" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <Zap className="h-5 w-5 mr-3" />
                 Agent Learning
               </a>
             </li>
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/preference" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <User className="h-5 w-5 mr-3" />
                 User Preferences
               </a>
             </li>
             <li>
-              <a href="#" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
+              <a href="/settings" className="flex items-center p-3 text-indigo-100 hover:bg-indigo-800 rounded-lg">
                 <Settings className="h-5 w-5 mr-3" />
                 Settings
               </a>

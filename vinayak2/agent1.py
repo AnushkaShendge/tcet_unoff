@@ -11,6 +11,7 @@ from PIL import Image
 import io
 import google.generativeai as genai
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -405,6 +406,7 @@ def handle_retry_with_feedback(task, error_message):
         }
 
 app = Flask(__name__)
+CORS(app)
 
 CORS(app)
 

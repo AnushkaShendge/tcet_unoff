@@ -9,6 +9,10 @@ import Login from './pages/Login';
 import Register from './pages/Signup';
 import CommunicationAIDashboard from './pages/dashboard';
 import VoiceInputPage from './pages/VoiceInput';
+import CommunicationsPage from './pages/Communication';
+import AgentLearningDashboard from './pages/agentLearning';
+import UserPreferencesPage from './pages/userPrefrences';
+import SettingsPage from './pages/Settings';
 
 function App() {
   const [count, setCount] = useState(0);
@@ -24,6 +28,10 @@ function App() {
         <Route path='/register' element={<Register />} />
         <Route path='/dashboard' element={<CommunicationAIDashboard />} />
         <Route path='/voice' element={<VoiceInputPage />} />
+        <Route path='/communication' element={<CommunicationsPage />} />
+        <Route path='/learning' element={<AgentLearningDashboard />} />
+        <Route path='/preference' element={<UserPreferencesPage />} />
+        <Route path='/settings' element={<SettingsPage />} />
       </Routes>
     </>
   );
