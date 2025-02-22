@@ -1,0 +1,16 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 10px;
+  }
+  
+  #results {
+    max-width: 300px;
+  }
+  
+  #output {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: #f4f4f4;
+    padding: 10px;
+    border-radius: 5px;
+  }
