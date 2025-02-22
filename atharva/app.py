@@ -5,16 +5,18 @@ import os
 import subprocess
 import logging
 import requests
+from flask_cors import CORS
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-# Configure upload folder
+CORS(app)
+# Update allowed extensions to include webm
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg'}
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -39,11 +41,11 @@ def extract_language_name(lang_code_and_name):
     """Extract just the language name from the format 'code: Name'"""
     return lang_code_and_name.split(': ')[1] if ': ' in lang_code_and_name else lang_code_and_name
 
-def convert_m4a_to_mp3(input_path):
-    """Convert m4a file to mp3 using ffmpeg"""
+def convert_to_mp3(input_path):
+    """Convert any audio format to mp3 using ffmpeg"""
     output_path = input_path.rsplit('.', 1)[0] + '.mp3'
     try:
-        # Run ffmpeg command to convert m4a to mp3
+        # Run ffmpeg command to convert to mp3
         cmd = ['ffmpeg', '-i', input_path, '-acodec', 'libmp3lame', '-ab', '192k', output_path, '-y']
         subprocess.run(cmd, check=True, capture_output=True)
         logger.info(f"Converted {input_path} to {output_path}")
@@ -55,9 +57,20 @@ def convert_m4a_to_mp3(input_path):
         logger.error(f"Conversion error: {str(e)}")
         raise
 
+def detect_language(audio_path):
+    """Detect language from audio file"""
+    try:
+        signal = language_id.load_audio(audio_path)
+        prediction = language_id.classify_batch(signal)
+        detected_language = extract_language_name(prediction[3][0])
+        return detected_language
+    except Exception as e:
+        logger.error(f"Language detection error: {str(e)}")
+        raise
+
 def get_language_code(language_name):
     """Convert language name to code for transcription"""
-    # Add mappings as needed
+    # Your existing language mappings dictionary here
     language_mappings = {
         'English': 'en',
         'Hindi': 'hi',
@@ -104,77 +117,12 @@ def get_language_code(language_name):
         'Lithuanian': 'lt',
         'Latvian': 'lv',
         'Estonian': 'et',
+        # ... (rest of your mappings)
     }
-
-    return language_mappings.get(language_name, 'en')  # Default to English if not found
-
-@app.route('/identify_language', methods=['POST'])
-def identify_language():
-    # Check if a file was uploaded
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type'}), 400
-
-    converted_file = None
-    try:
-        # Save the uploaded file
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Convert m4a to mp3 if needed
-        if filename.lower().endswith('.m4a'):
-            logger.info(f"Converting m4a file: {filepath}")
-            converted_file = convert_m4a_to_mp3(filepath)
-            processing_path = converted_file
-        else:
-            processing_path = filepath
-
-        # Load the model if not already loaded
-        load_model()
-
-        try:
-            # Use SpeechBrain's audio loading
-            signal = language_id.load_audio(processing_path)
-            prediction = language_id.classify_batch(signal)
-            
-        finally:
-            # Clean up the uploaded and converted files
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            if converted_file and os.path.exists(converted_file):
-                os.remove(converted_file)
-
-        # Extract just the language name and return it
-        language_name = extract_language_name(prediction[3][0])
-        return jsonify({
-            'language': language_name,
-            'file_processed': os.path.basename(processing_path)
-        })
-
-    except Exception as e:
-        # Add detailed error logging
-        logger.error(f"Error processing request: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        # Clean up files in case of error
-        if 'filepath' in locals() and os.path.exists(filepath):
-            os.remove(filepath)
-        if converted_file and os.path.exists(converted_file):
-            os.remove(converted_file)
-            
-        return jsonify({'error': str(e)}), 500
+    return language_mappings.get(language_name, 'en')
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    # Check if a file was uploaded
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     
@@ -185,32 +133,33 @@ def transcribe():
     if not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type'}), 400
 
+    original_file = None
     converted_file = None
+    
     try:
         # Save the uploaded file
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+        original_file = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(original_file)
         
-        # Convert m4a to mp3 if needed
-        if filename.lower().endswith('.m4a'):
-            logger.info(f"Converting m4a file: {filepath}")
-            converted_file = convert_m4a_to_mp3(filepath)
+        # Convert to mp3 if needed
+        if not filename.lower().endswith('.mp3'):
+            logger.info(f"Converting {filename} to MP3")
+            converted_file = convert_to_mp3(original_file)
             processing_path = converted_file
         else:
-            processing_path = filepath
+            processing_path = original_file
 
-        # First detect the language
+        # Load model and detect language
         load_model()
-        signal = language_id.load_audio(processing_path)
-        prediction = language_id.classify_batch(signal)
-        detected_language = extract_language_name(prediction[3][0])
+        detected_language = detect_language(processing_path)
         language_code = get_language_code(detected_language)
+        
+        logger.info(f"Detected language: {detected_language} (code: {language_code})")
 
         # Make request to the transcription service
-        transcription_url = "https://8817-34-127-75-234.ngrok-free.app/transcribe/"
+        transcription_url = "https://ac77-35-185-196-1.ngrok-free.app/transcribe/"
         
-        # Open and close the file properly using a context manager
         with open(processing_path, 'rb') as audio_file:
             files = {
                 'file': audio_file
@@ -219,30 +168,29 @@ def transcribe():
                 'language': language_code
             }
             response = requests.post(transcription_url, files=files, data=data)
+
+        # Add language detection info to response
+        response_data = response.json()
+        response_data['detected_language'] = detected_language
+        response_data['language_code'] = language_code
         
-        # Now that the file handle is closed, we can safely remove the files
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        if converted_file and os.path.exists(converted_file):
-            os.remove(converted_file)
-        
-        return response.json()
+        return jsonify(response_data)
 
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
         
-        # Clean up files in case of error
+    finally:
+        # Clean up files
         try:
-            if 'filepath' in locals() and os.path.exists(filepath):
-                os.remove(filepath)
+            if original_file and os.path.exists(original_file):
+                os.remove(original_file)
             if converted_file and os.path.exists(converted_file):
                 os.remove(converted_file)
         except Exception as cleanup_error:
             logger.error(f"Error during cleanup: {cleanup_error}")
-            
-        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Check if ffmpeg is installed
@@ -250,13 +198,12 @@ if __name__ == '__main__':
         subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
         logger.info("FFmpeg is installed and working")
     except (subprocess.SubprocessError, FileNotFoundError):
-        logger.error("FFmpeg is not installed or not in PATH. Please install FFmpeg to convert m4a files.")
-        print("ERROR: FFmpeg is required for m4a conversion. Please install it before running this app.")
+        logger.error("FFmpeg is not installed or not in PATH. Please install FFmpeg to convert audio files.")
+        print("ERROR: FFmpeg is required for audio conversion. Please install it before running this app.")
         print("  - Ubuntu/Debian: sudo apt-get install ffmpeg")
         print("  - macOS: brew install ffmpeg")
         print("  - Windows: Download from ffmpeg.org and add to PATH")
         exit(1)
         
-    # Load the model when starting the server
     load_model()
     app.run(debug=True, port=4000)

@@ -3,7 +3,11 @@
     "name": "Agent Extension",
     "version": "1.0",
     "description": "An extension to send selected text to the backend for processing.",
-    "permissions": ["activeTab", "contextMenus", "storage"],
+    "permissions": ["activeTab", "contextMenus", "storage", "notifications"],
+    "host_permissions": [
+      "http://localhost:5002/*",
+      "http://localhost/*"
+    ],
     "background": {
       "service_worker": "background.js"
     },
